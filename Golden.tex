@@ -1,15 +1,27 @@
 \documentclass{article}
+% Enlarge the usable area of the page and set to landscape to better fit
 \usepackage[landscape,scale=.9]{geometry}
+% We use TikZ to place the digits, and to put the rectangles behind
 \usepackage{tikz}
+% The maths is handles by LaTeX3
 \usepackage{expl3}
 \usepackage{xparse}
+% No point having page numbers
 \thispagestyle{empty}
 
+% Kick off the LaTeX3 code
 \ExplSyntaxOn
+% Inside a TikZ picture the font is set to \nullfont; the command
+% \pgfutil@selectfont is used to restore it, but within the LaTeX3
+% section we don't want to be fiddling with @s so we make an alias
+% more suitable to LaTeX3.
 \makeatletter
 \cs_set_eq:NN \font_restore: \pgfutil@selectfont
 \makeatother
 
+% There's an issue with putting TikZ code inside LaTeX3 code to do
+% with colons (they're letters in LaTeX3 but not in TikZ) so we store
+% a colon with the right catcode in the following token list.
 \tl_new:N \g__golden_colon_tl
 \group_begin:
 \char_set_lccode:nn {`;}{`:}
@@ -18,6 +30,9 @@
   \tl_set:Nn \g__golden_colon_tl {;}
 }
 
+% This token list holds the actual digits, currently 10,000 decimal
+% places (so 10,002 tokens in total).  The source is
+% http://www.maths.surrey.ac.uk/hosted-sites/R.Knott/Fibonacci/phi10000dps.txt
 \tl_new:N \l__golden_tl
 \tl_set:Nn \l__golden_tl {
 1.618033988749894848204586834365638117720309179805762862135448622705260462818
@@ -156,148 +171,201 @@
   441117250923132797711380
 }
 
-\int_new:N \l__golden_len_int
-\int_set:Nn \l__golden_len_int {\tl_count:N \l__golden_tl}
-
+% We need to measure the digits and so we need a golden box to put
+% them in for measuring.
 \box_new:N \l__golden_box
 
+% We do a lot of maths in this so need a fair few fp registers to hold
+% all the calculations.
+% The first is the golden ratio itself (well, its reciprocal).
 \fp_new:N \l__ratio_fp
-\fp_new:N \l__golden_fp
-\fp_new:N \l__scale_fp
+\fp_set:Nn \l__ratio_fp {-(1 - sqrt(5))/2}
+% Next is the cumulative arc length; that is, the how far along the
+% current quarter circle we are.
 \fp_new:N \l__arc_fp
+% This holds the current scale factor for the digits.
+\fp_new:N \l__scale_fp
+% This holds the radius of the current quarter circle arc.
 \fp_new:N \l__radius_fp
+% These hold the centre of the circle that we're currently on.
 \fp_new:N \l__centre_x_fp
 \fp_new:N \l__centre_y_fp
-\fp_set:Nn \l__ratio_fp {-(1 - sqrt(5))/2}
-\fp_set:Nn \l__radius_fp {\dim_to_fp:n { \textwidth - 1cm} /(\dim_to_fp:n {1cm}) *\l__ratio_fp}
-\fp_set:Nn \l__golden_fp {0}
-\fp_set:Nn \l__scale_fp {1}
-\fp_set:Nn \l__arc_fp {\c_pi_fp * \l__radius_fp/2}
-\fp_set:Nn \l__centre_x_fp {0}
-\fp_set:Nn \l__centre_y_fp {0}
 
+% We keep count of a few things.
+% First up, the digit that we're currently considering.
 \int_new:N \l__golden_int
+% Secondly, the segment, by which we mean the quarter circle that
+% we're currently traversing.
 \int_new:N \l__segment_int
-\int_set:Nn \l__golden_int {1}
-\int_set:Nn \l__segment_int {0}
 
 
-
-\cs_new_nopar:Npn \golden_char:
-{
-  \tl_set:Nx \l__golden_tmpa_tl {\tl_item:Nn \l__golden_tl {\int_use:N      \l__golden_int}}
-  \group_begin:
-  \font_restore:
-  \hbox_gset:Nn \l__golden_box {\tl_use:N \l__golden_tmpa_tl}
-  \group_end:
-  \fp_set:Nn \l__scale_fp {\l__ratio_fp ^ \l__golden_fp}
-  \fp_set:Nn \l__golden_fp {\l__golden_fp + \l__scale_fp * \dim_to_fp:n{ \box_wd:N \l__golden_box} / \dim_to_fp:n {1cm}}
-  \int_gincr:N \l__golden_int
-}
-
-\NewDocumentCommand \GoldenChar {O{}}
-{
-  \golden_char:
-  \node[#1,scale=\fp_to_decimal:N \l__scale_fp,anchor=base] at (\fp_to_decimal:N
-  \l__golden_fp,0) {\box_use:N \l__golden_box};
-}
-
-
-
+% This is the command that does all the work.
+% The mandatory argument is the number of characters, the optional
+% argument is passed through to the node command.
 \NewDocumentCommand \GoldenChars {O{} m}
 {
-\group_begin:
+  % Now we set the initial values of all of those fp registers.
+  \fp_set:Nn \l__radius_fp {\dim_to_fp:n { \textwidth - 1cm} /(\dim_to_fp:n {1cm}) *\l__ratio_fp}
+  \fp_set:Nn \l__scale_fp {1}
+  \fp_set:Nn \l__centre_x_fp {0}
+  \fp_set:Nn \l__centre_y_fp {0}
+  % Initialise those integers.
+  \int_set:Nn \l__golden_int {1}
+  \int_set:Nn \l__segment_int {0}
+
+  % We need to start slightly offset from the initial position, the
+  % offset is determined by the width of the initial character
   \tl_set:Nx \l__golden_tmpa_tl {\tl_head:N \l__golden_tl}
+  % To measure its width, we put it in a box; as we need to restore
+  % the font we work in a group.
   \group_begin:
   \font_restore:
   \hbox_gset:Nn \l__golden_box {\tl_use:N \l__golden_tmpa_tl}
   \group_end:
- \fp_set:Nn \l__golden_fp {\l__golden_fp - \dim_to_fp:n{ \box_wd:N \l__golden_box} / \dim_to_fp:n {1cm}}
+  % Set the initial arc length to be the width of that first digit (we
+  % work in centimetres).
+  \fp_set:Nn \l__arc_fp { - \dim_to_fp:n{ \box_wd:N \l__golden_box} / \dim_to_fp:n {1cm}}
 
+  % This is the code that works through the digits.
   \prg_replicate:nn {#2}
   {
-  \tl_set:Nx \l__golden_tmpa_tl {\tl_item:Nn \l__golden_tl {\int_use:N      \l__golden_int}}
-  \group_begin:
-  \font_restore:
-  \hbox_gset:Nn \l__golden_box {\tl_use:N \l__golden_tmpa_tl}
-  \group_end:
+    % Get the next digit (this could probably be made more efficient
+    % by stripping off each digit in turn).
+    \tl_set:Nx \l__golden_tmpa_tl {\tl_item:Nn \l__golden_tl
+      {\int_use:N \l__golden_int}}
 
-  \fp_set:Nn \l__scale_fp {\l__ratio_fp ^ (\l__segment_int + 2*\l__golden_fp / (\c_pi_fp*\l__radius_fp))}
+    % The current scale factor is computed by taking the golden ratio
+    % (well, its reciprocal) to the power of the arc length normalised
+    % so that after we go through a quarter circle we've scaled by the
+    % golden ratio.  As we reset the arc length each quarter circle,
+    % we include the count of the number of segments to take that into
+    % account.
+    \fp_set:Nn \l__scale_fp {\l__ratio_fp ^ (\l__segment_int + 2*\l__arc_fp / (\c_pi_fp*\l__radius_fp))}
 
+    % The angle we're at is computed by working out the ratio of the
+    % accumulated arc length to the arc length of the current quarter
+    % circle.  We need it a couple of times so store it in a token
+    % list.
     \tl_set:Nx \l_tmpb_tl
     {
       \fp_to_decimal:n {
-        90-180 * \l__golden_fp/(\c_pi_fp*\l__radius_fp)}
+        90-180 * \l__arc_fp/(\c_pi_fp*\l__radius_fp)}
     }
+    % The token list \l_tmpa_tl will contain the TikZ code that places
+    % the digit in the right place at the right size and the right
+    % angle.  We assemble it, expanding out a few pieces to ensure
+    % that the code that TikZ gets is fairly clean.
     \tl_set:Nn \l_tmpa_tl
     {
       \path 
     }
+    % Start by setting the coordinate to the centre of the circle that
+    % we're traversing and then moving from there by the computed
+    % angle and the current radius.
     \tl_put_right:Nx \l_tmpa_tl
     {
       (\fp_to_decimal:N \l__centre_x_fp,\fp_to_decimal:N \l__centre_y_fp)
       ++(90-90*\int_use:N \l__segment_int +\tl_use:N \l_tmpb_tl \tl_use:N \g__golden_colon_tl \fp_to_decimal:N \l__radius_fp)
     }
+    % Now, the code for the node.
     \tl_put_right:Nn \l_tmpa_tl
     {
       node[#1,scale=
       }
+      % Add in the scale factor, the angle, and the anchor.
       \tl_put_right:Nx \l_tmpa_tl
-      {\fp_to_decimal:N \l__scale_fp,rotate=-90*\int_use:N \l__segment_int +\tl_use:N \l_tmpb_tl,anchor=mid ~west] }
-    \tl_put_right:Nn \l_tmpa_tl {{\box_use:N \l__golden_box};}
+      {\fp_to_decimal:N \l__scale_fp,rotate=-90*\int_use:N
+        \l__segment_int +\tl_use:N \l_tmpb_tl,anchor=mid ~west] }
+    % Finally, put the digit in the node contents.
+    \tl_put_right:Nn \l_tmpa_tl {{\tl_use:N\l__golden_tmpa_tl};}
+    % Now pass all that lot along to TikZ.
     \tl_use:N \l_tmpa_tl
- \int_incr:N \l__golden_int
-  \fp_set:Nn \l__golden_fp {\l__golden_fp + \l__scale_fp * \dim_to_fp:n{ \box_wd:N \l__golden_box} / \dim_to_fp:n {1cm}}
 
+    % Increment the digit counter
+    \int_incr:N \l__golden_int
+    % Stick the digit we've just placed in a box to measure its width.
+    % We do this in a group as we need to restore the original font.
+    \group_begin:
+    \font_restore:
+    \hbox_gset:Nn \l__golden_box {\tl_use:N \l__golden_tmpa_tl}
+    \group_end:
+
+    % Now compute the new arc length (working in centimetres) by
+    % taking the width of the box containing the digit and scaling by
+    % the current scale factor.
+    \fp_set:Nn \l__arc_fp {\l__arc_fp + \l__scale_fp * \dim_to_fp:n{ \box_wd:N \l__golden_box} / \dim_to_fp:n {1cm}}
+
+    % This is what the new angle will be on the next cycle under the
+    % current regime.
     \tl_set:Nx \l_tmpb_tl
     {
       \fp_to_decimal:n {
-        90-180 *\l__golden_fp/(\c_pi_fp*\l__radius_fp)}
+        90-180 *\l__arc_fp/(\c_pi_fp*\l__radius_fp)}
     }
+    
+    % To see if we're due to move to the next segment, we compare the
+    % new angle to zero.
     \fp_compare:nT
     {
       \l_tmpb_tl <= 0
     }
     {
-      \fp_set:Nn \l__centre_x_fp {\l__centre_x_fp + \l__radius_fp * (1 - \l__ratio_fp ) * sind(90*\int_use:N \l__segment_int )}
-      \fp_set:Nn \l__centre_y_fp {\l__centre_y_fp + \l__radius_fp * (1 - \l__ratio_fp ) * cosd(90*\int_use:N \l__segment_int )}
-  \fp_set:Nn \l__golden_fp {\l__golden_fp - \c_pi_fp * \l__radius_fp/2}
+      % If we're less than (or equal to) zero then we are in the next
+      % segment so need to shift our centre (probably a more efficient
+      % way to compute this).
+      \fp_set:Nn \l__centre_x_fp {\l__centre_x_fp + \l__radius_fp * (1
+        - \l__ratio_fp ) * sind(90*\int_use:N \l__segment_int )}
+      \fp_set:Nn \l__centre_y_fp {\l__centre_y_fp + \l__radius_fp * (1
+        - \l__ratio_fp ) * cosd(90*\int_use:N \l__segment_int )}
+      % As we're on the new segment, we reset the arc length by
+      % subtracting off the length of the quarter circle.
+      \fp_set:Nn \l__arc_fp {\l__arc_fp - \c_pi_fp * \l__radius_fp/2}
+      % Adjust the radius
       \fp_set:Nn \l__radius_fp {\l__ratio_fp * \l__radius_fp}
-    \int_incr:N \l__segment_int
+      % Increment the segment counter
+      \int_incr:N \l__segment_int
     }
   }
-\group_end:
 }
 
+% Expose the radius and value of the (reciprocal of the) golden ratio
+% so that we can use them elsewhere in the TikZ picture.
 \tl_new:N \radius
-\tl_set:Nn \radius {\fp_to_decimal:N \l__radius_fp}
+\tl_set:Nx \radius {\fp_to_decimal:N \l__radius_fp}
+\tl_new:N \gphi
+\tl_set:Nx \gphi {\fp_to_decimal:N \l__ratio_fp}
 
+% Finally, leave all that LaTeX3 stuff behind us.
 \ExplSyntaxOff
 
-\title{The Golden Spiral}
-\author{Andrew Stacey}
-\date{2014-10-24}
 \begin{document}
-%\maketitle
-%\def\radius{1}
+
+% We put some squares behind the digits to make the spiral more
+% evident.  These macros help us keep track of where the rectangles go
+% by pointing across the diagonals of the squares.  What happens is
+% that they rotate around starting at (1,1) and going round clockwise
+% from there.
 \def\xsign{1}
 \def\ysign{1}
-\pgfmathsetmacro{\gphi}{(sqrt(5)-1)/2}
 \begin{tikzpicture}
 \draw[ultra thin] (-\radius,0)
-foreach \k in {0,...,10} {
+foreach \k in {0,...,30} {
   rectangle ++(\xsign*\radius,\ysign*\radius)
   \pgfextra{%
+    % Adjust the size of the square
     \pgfmathsetmacro\radius{\radius*\gphi}%
+    % Rotate the diagonal
     \let\tsign=\xsign
     \pgfmathsetmacro\xsign{\ysign}
     \pgfmathsetmacro\ysign{-\tsign}
+    % PGF foreaches are in a group so we need to make these global.
     \global\let\radius=\radius
     \global\let\xsign=\xsign
     \global\let\ysign=\ysign
   }
 };
-\GoldenChars{10000}
+% Let's do some digits.
+\GoldenChars{9999}
 \end{tikzpicture}
 
 \end{document}
