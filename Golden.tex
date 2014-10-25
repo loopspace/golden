@@ -185,8 +185,12 @@
 \fp_new:N \l__arc_fp
 % This holds the current scale factor for the digits.
 \fp_new:N \l__scale_fp
+% This holds the radius of the first quarter circle arc.
+\fp_new:N \l__iradius_fp
 % This holds the radius of the current quarter circle arc.
 \fp_new:N \l__radius_fp
+\fp_set:Nn \l__iradius_fp {\dim_to_fp:n { \textwidth - 1cm} /(\dim_to_fp:n {1cm}) *\l__ratio_fp}
+
 % These hold the centre of the circle that we're currently on.
 \fp_new:N \l__centre_x_fp
 \fp_new:N \l__centre_y_fp
@@ -205,7 +209,7 @@
 \NewDocumentCommand \GoldenChars {O{} m}
 {
   % Now we set the initial values of all of those fp registers.
-  \fp_set:Nn \l__radius_fp {\dim_to_fp:n { \textwidth - 1cm} /(\dim_to_fp:n {1cm}) *\l__ratio_fp}
+  \fp_set_eq:NN \l__radius_fp \l__iradius_fp
   \fp_set:Nn \l__scale_fp {1}
   \fp_set:Nn \l__centre_x_fp {0}
   \fp_set:Nn \l__centre_y_fp {0}
@@ -327,11 +331,10 @@
     }
   }
 }
-
 % Expose the radius and value of the (reciprocal of the) golden ratio
 % so that we can use them elsewhere in the TikZ picture.
 \tl_new:N \radius
-\tl_set:Nx \radius {\fp_to_decimal:N \l__radius_fp}
+\tl_set:Nx \radius {\fp_to_decimal:N \l__iradius_fp}
 \tl_new:N \gphi
 \tl_set:Nx \gphi {\fp_to_decimal:N \l__ratio_fp}
 
@@ -348,7 +351,8 @@
 \def\xsign{1}
 \def\ysign{1}
 \begin{tikzpicture}
-\draw[ultra thin] (-\radius,0)
+\draw[ultra thin]
+(-\radius,0)
 foreach \k in {0,...,30} {
   rectangle ++(\xsign*\radius,\ysign*\radius)
   \pgfextra{%
