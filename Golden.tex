@@ -2,6 +2,7 @@
 % Enlarge the usable area of the page and set to landscape to better fit
 \usepackage[landscape,scale=.9]{geometry}
 % We use TikZ to place the digits, and to put the rectangles behind
+\usepackage[svgnames]{xcolor}
 \usepackage{tikz}
 % The maths is handles by LaTeX3
 \usepackage{expl3}
@@ -189,7 +190,7 @@
 \fp_new:N \l__iradius_fp
 % This holds the radius of the current quarter circle arc.
 \fp_new:N \l__radius_fp
-\fp_set:Nn \l__iradius_fp {\dim_to_fp:n { \textwidth - 1cm} /(\dim_to_fp:n {1cm}) *\l__ratio_fp}
+\fp_set:Nn \l__iradius_fp {\dim_to_fp:n { \textwidth - 2cm} /(\dim_to_fp:n {1cm}) *\l__ratio_fp}
 
 % These hold the centre of the circle that we're currently on.
 \fp_new:N \l__centre_x_fp
@@ -351,10 +352,13 @@
 \def\xsign{1}
 \def\ysign{1}
 \begin{tikzpicture}
-\draw[ultra thin]
-(-\radius,0)
-foreach \k in {0,...,30} {
-  rectangle ++(\xsign*\radius,\ysign*\radius)
+\fill[cyan!50!black] (-\radius,0) +(-.5,-.5) rectangle
+(\radius*\gphi+.5,\radius+.5);
+\path (-\radius,0) coordinate (a);
+\foreach[evaluate=\k as \tint using int(60-2*\k)] \k in {0,...,30} {
+\draw[ultra thin,gray,fill=cyan!\tint!black]
+(a)
+  rectangle ++(\xsign*\radius,\ysign*\radius) coordinate (a); 
   \pgfextra{%
     % Adjust the size of the square
     \pgfmathsetmacro\radius{\radius*\gphi}%
@@ -367,9 +371,9 @@ foreach \k in {0,...,30} {
     \global\let\xsign=\xsign
     \global\let\ysign=\ysign
   }
-};
+}
 % Let's do some digits.
-\GoldenChars{9999}
+\GoldenChars[Gold]{9999}
 \end{tikzpicture}
 
 \end{document}
